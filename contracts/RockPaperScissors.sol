@@ -25,7 +25,20 @@ contract RockPaperScissors {
     mapping(address => uint256) public balances;
     mapping(uint256 => Game) public activeGames;
 
-    uint256 gameCounter = 0;
+    uint256 private gameCounter = 0;
+
+
+    /*
+     * Events
+     */
+
+    event LogDeposit(address indexed user, uint256 amount);
+    event LogWithdrawal(address indexed user, uint256 amount);
+    event LogNewGame(uint256 indexed gameId, address indexed player1, address indexed player2, uint256 wager);
+    event LogPlayer2Joined(uint256 indexed gameId, address indexed player2);
+    event LogActionSubmitted(uint256 indexed gameId, address player);
+    event LogActionRevealed(uint256 indexed gameId, address player, uint8 action);
+    event LogGameFinished(uint256 indexed gameId, address indexed winner);
 
 
     /*
@@ -38,6 +51,7 @@ contract RockPaperScissors {
 
     function deposit() public payable {
         balances[msg.sender] += msg.value;
+        emit LogDeposit(msg.sender, msg.value);
     }
 
     function withdraw() public {
@@ -45,6 +59,7 @@ contract RockPaperScissors {
         require(amount > 0, "No balance available");
         balances[msg.sender] = 0;
         msg.sender.transfer(amount);
+        emit LogWithdrawal(msg.sender, amount);
     }
 
 
@@ -65,7 +80,7 @@ contract RockPaperScissors {
 
         gameCounter++;
         activeGames[gameCounter] = gameObj;
-        return gameCounter;
+        emit LogNewGame(gameCounter, msg.sender, player2, wager);
     }
 
     function joinGame(uint256 gameId) public payable {
@@ -83,6 +98,7 @@ contract RockPaperScissors {
 
         gameObj._stage = Stages.active;
         gameObj._deadline = block.timestamp + 5 minutes;
+        emit LogPlayer2Joined(gameId, msg.sender);
     }
 
     function submitAction(uint256 gameId, bytes32 actionHash) public {
@@ -101,6 +117,7 @@ contract RockPaperScissors {
             revert("Must be player1 or player2");
         }
 
+        emit LogActionSubmitted(gameId, msg.sender);
         if (gameObj._actionHashP1.length != 0 && gameObj._actionHashP2.length != 0) {
             gameObj._stage = Stages.revealing;
             gameObj._deadline = block.timestamp + 5 minutes;
@@ -114,30 +131,23 @@ contract RockPaperScissors {
         bytes32 hashValue = keccak256(abi.encodePacked(action, salt));
 
         if (msg.sender == gameObj._player1) {
-            // require(gameObj._actionP1 == 0, "P1 already revealed");
-            // should be redundant? Let's say P1 reveals, actionHash get's deleted,
-            // after which P1 submits a second reveal. The second reveal should not be
-            // able to match an empty bytes32 ?
-            if (hashValue == gameObj._actionHashP1) {
-                gameObj._actionP1 = action;
-                delete gameObj._actionHashP1;
-            } else {
-                revert("Revealed solution does not match");
-            }
+            require(hashValue == gameObj._actionHashP1, "Revealed action does not match hashed action");
+            require(action == 1 || action == 2 || action == 3, "Revealed action violates game rules");
+            // if P1 violates rules -> P2 can wait for deadline to pass and resolve game in his favour
+            gameObj._actionP1 = action;
+            delete gameObj._actionHashP1;
 
         } else if (msg.sender == gameObj._player2) {
-            // require(gameObj._actionP2 == 0, "P2 already revealed");
-            if (hashValue == gameObj._actionHashP2) {
-                gameObj._actionP2 = action;
-                delete gameObj._actionHashP2;
-            } else {
-                revert("Revealed solution does not match");
-            }
+            require(hashValue == gameObj._actionHashP2, "Revealed action does not match hashed action");
+            require(action == 1 || action == 2 || action == 3, "Revealed action violates game rules");
+            gameObj._actionP2 = action;
+            delete gameObj._actionHashP2;
 
         } else {
             revert("Must be player1 or player2");
         }
 
+        emit LogActionRevealed(gameId, msg.sender, action);
         if (gameObj._actionP1 != 0 && gameObj._actionP2 != 0) {
             gameObj._stage = Stages.finals;
         }
@@ -226,12 +236,14 @@ contract RockPaperScissors {
     function _p1Wins(uint256 gameId) internal {
         Game storage gameObj = activeGames[gameId];
         balances[gameObj._player1] += gameObj._wager * 2;
+        emit LogGameFinished(gameId, gameObj._player1);
         delete activeGames[gameId];
     }
 
     function _p2Wins(uint256 gameId) internal {
         Game storage gameObj = activeGames[gameId];
         balances[gameObj._player2] += gameObj._wager * 2;
+        emit LogGameFinished(gameId, gameObj._player2);
         delete activeGames[gameId];
     }
 
@@ -239,6 +251,7 @@ contract RockPaperScissors {
         Game storage gameObj = activeGames[gameId];
         balances[gameObj._player1] += gameObj._wager;
         balances[gameObj._player2] += gameObj._wager;
+        emit LogGameFinished(gameId, address(0));
         delete activeGames[gameId];
     }
 }
