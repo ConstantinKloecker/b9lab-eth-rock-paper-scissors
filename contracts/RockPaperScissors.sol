@@ -32,9 +32,6 @@ contract RockPaperScissors {
      * General Functions
      */
 
-    constructor() public {
-    }
-
     function() external {
         revert("Call specific function");
     }
