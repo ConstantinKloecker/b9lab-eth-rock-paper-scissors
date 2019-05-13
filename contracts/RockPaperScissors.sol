@@ -1,6 +1,10 @@
 pragma solidity ^0.5.0;
 
+import {SafeMath} from "./SafeMath.sol";
+
 contract RockPaperScissors {
+
+    using SafeMath for uint256;
 
     /*
      * State Variables
@@ -50,7 +54,7 @@ contract RockPaperScissors {
     }
 
     function deposit() public payable {
-        balances[msg.sender] += msg.value;
+        balances[msg.sender] = balances[msg.sender].add(msg.value);
         emit LogDeposit(msg.sender, msg.value);
     }
 
@@ -235,22 +239,22 @@ contract RockPaperScissors {
 
     function _p1Wins(uint256 gameId) internal {
         Game storage gameObj = activeGames[gameId];
-        balances[gameObj._player1] += gameObj._wager * 2;
+        balances[gameObj._player1] = balances[gameObj._player1].add(gameObj._wager * 2);
         emit LogGameFinished(gameId, gameObj._player1);
         delete activeGames[gameId];
     }
 
     function _p2Wins(uint256 gameId) internal {
         Game storage gameObj = activeGames[gameId];
-        balances[gameObj._player2] += gameObj._wager * 2;
+        balances[gameObj._player2] = balances[gameObj._player2].add(gameObj._wager * 2);
         emit LogGameFinished(gameId, gameObj._player2);
         delete activeGames[gameId];
     }
 
     function _draw(uint256 gameId) internal {
         Game storage gameObj = activeGames[gameId];
-        balances[gameObj._player1] += gameObj._wager;
-        balances[gameObj._player2] += gameObj._wager;
+        balances[gameObj._player1] = balances[gameObj._player1].add(gameObj._wager);
+        balances[gameObj._player2] = balances[gameObj._player1].add(gameObj._wager);
         emit LogGameFinished(gameId, address(0));
         delete activeGames[gameId];
     }
